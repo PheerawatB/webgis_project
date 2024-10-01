@@ -9,9 +9,9 @@ import { GeoserverDataService } from '../../../services/geoserver/geoserver-data
 export class LiveMonitorComponent implements OnInit{
   constructor(private GeoserDataService: GeoserverDataService){}
   ngOnInit(): void {
-    this.GeoserDataService.GetLayerLists().subscribe(res =>{
-      console.log(res);
-    });
+    // this.GeoserDataService.GetLayerLists().subscribe(res =>{
+    //   // console.log(res);
+    // });
   }
   eventsData = [
     { date: '2024-06-01 10:14:59', type: 'Alarm', system: 'SENSOR', details: 'Sensor 002 Alarm - Human Detection' },

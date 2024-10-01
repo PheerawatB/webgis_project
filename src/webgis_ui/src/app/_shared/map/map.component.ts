@@ -4,6 +4,7 @@ import { StyleControl } from '../../../models/stylecontrol';
 import * as turf from '@turf/turf';
 import { GeoserverDataService } from '../../../services/geoserver/geoserver-data.service';
 import { environment } from '../../../environments/environment.dev';
+import { ActivatedRoute } from '@angular/router';
 @Component({
   selector: 'app-map',
   templateUrl: './map.component.html',
@@ -13,36 +14,92 @@ export class MapComponent implements OnInit, OnDestroy {
   @Input() defaultCenter: [number, number] = [100.5018, 13.7563];
   @Input() defaultZoom: number = 8;
   map!: maplibregl.Map;
-
-  constructor(private GeoDataService: GeoserverDataService) { }
+  currentRoute: string = '';
+  constructor(private GeoDataService: GeoserverDataService, private route: ActivatedRoute) { }
   ngOnInit(): void {
-    console.log('in');
-
+    this.currentRoute = this.route.snapshot.routeConfig?.path || ''; // Get the current route path
     this.initializeMap();
     this.setMapHeight(); // Set initial map height
   }
 
-  // Listen for window resize events to adjust map height
-  @HostListener('window:resize', ['$event'])
-  onResize(event: Event) {
-    this.setMapHeight();
-  }
-
+  //#region  Initailize Map libre
   initializeMap(): void {
-    // Define available styles
-
     const savedZoom = localStorage.getItem('mapZoom');
     const savedCenter = localStorage.getItem('mapCenter');
 
-    this.map = new maplibregl.Map({
-      container: 'map',
-      // style: 'https://api.maptiler.com/maps/d9a4b917-d11b-4c66-8566-d42eb37737ec/style.json?key=89niYR6Aow3J66RlqxlA',
-      style: 'https://api.maptiler.com/maps/basic-v2/style.json?key=89niYR6Aow3J66RlqxlA',
-      center: savedCenter ? JSON.parse(savedCenter) : this.defaultCenter,
-      zoom: savedZoom ? parseFloat(savedZoom) : this.defaultZoom,
-    });
+    if (this.currentRoute === 'live-monitor') {
+      this.map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://api.maptiler.com/maps/basic-v2/style.json?key=89niYR6Aow3J66RlqxlA', // Default style
+        center: savedCenter ? JSON.parse(savedCenter) : this.defaultCenter,
+        zoom: savedZoom ? parseFloat(savedZoom) : this.defaultZoom,
+      });
+      this.loadRoadData();
+    } else if (this.currentRoute === 'editor-map') {
+      this.map = new maplibregl.Map({
+        container: 'map',
+        style: { // Custom style for the editor map
+          'version': 8,
+          'sources': {
+            'raster-tiles': {
+              'type': 'raster',
+              'tiles': ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              'tileSize': 256,
+              'minzoom': 0,
+              'maxzoom': 19
+            }
+          },
+          'layers': [
+            {
+              'id': 'background',
+              'type': 'background',
+              'paint': { 'background-color': '#e0dfdf' }
+            },
+            {
+              'id': 'simple-tiles',
+              'type': 'raster',
+              'source': 'raster-tiles'
+            }
+          ]
+        },
+        center: [-87.61694, 41.86625],
+        zoom: 15.99,
+        pitch: 40,
+        bearing: 20,
+        antialias: true
+      });
 
-    this.loadRoadData();
+      this.map.on('load', () => {
+        this.map.addSource('floorplan', {
+            // GeoJSON Data source used in vector tiles, documented at
+            // https://gist.github.com/ryanbaumann/a7d970386ce59d11c16278b90dde094d
+            'type': 'geojson',
+            'data': 'https://maplibre.org/maplibre-gl-js/docs/assets/indoor-3d-map.geojson'
+        });
+        this.map.addLayer({
+            'id': 'room-extrusion',
+            'type': 'fill-extrusion',
+            'source': 'floorplan',
+            'paint': {
+                // See the MapLibre Style Specification for details on data expressions.
+                // https://maplibre.org/maplibre-style-spec/expressions/
+
+                // Get the fill-extrusion-color from the source 'color' property.
+                'fill-extrusion-color': ['get', 'color'],
+
+                // Get fill-extrusion-height from the source 'height' property.
+                'fill-extrusion-height': ['get', 'height'],
+
+                // Get fill-extrusion-base from the source 'base_height' property.
+                'fill-extrusion-base': ['get', 'base_height'],
+
+                // Make extrusions slightly opaque for see through indoor walls.
+                'fill-extrusion-opacity': 0.5
+            }
+        });
+    });
+    }
+
     this.initialMapController();
     this.mapEvents();
   }
@@ -58,13 +115,21 @@ export class MapComponent implements OnInit, OnDestroy {
     this.map.addControl(new StyleControl(), 'bottom-left');
   }
 
-
-  loadRoadData(): void {
-    this.map.on('load', () => {
-      this.addRasterOnMap();
+  mapEvents(): void {
+    this.map.on('zoomend', () => {
+      const zoomLevel = this.map.getZoom();
+      localStorage.setItem('mapZoom', zoomLevel.toString());
+    });
+    this.map.on('moveend', () => {
+      const center = this.map.getCenter();
+      localStorage.setItem('mapCenter', JSON.stringify([center.lng, center.lat]));
     });
   }
 
+  //#endregion
+
+
+  //#region  Initialize Raster Layer && Road 
   addRasterOnMap(): void {
     const rasterSourceId = 'my-raster-source'; // Define a unique ID for the source
     const rasterLayerId = 'my-raster-layer'; // Define a unique ID for the layer
@@ -104,7 +169,7 @@ export class MapComponent implements OnInit, OnDestroy {
           res.coverage.nativeBoundingBox.maxx,  // maxX
           res.coverage.nativeBoundingBox.maxy   // maxY
         ].join(','); // Format as "minX,minY,maxX,maxY"
-        console.log('BBOX of the raster layer:', bbox);
+        // console.log('BBOX of the raster layer:', bbox);
         this.setRoadOnMap(bbox)
       })
       // If the source exists, calculate the BBOX based on the current map bounds
@@ -113,6 +178,13 @@ export class MapComponent implements OnInit, OnDestroy {
     } else {
       console.error(`Source "${sourceId}" does not exist.`);
     }
+  }
+
+
+  loadRoadData(): void {
+    this.map.on('load', () => {
+      this.addRasterOnMap();
+    });
   }
 
   setRoadOnMap(bbox: string) {
@@ -133,9 +205,15 @@ export class MapComponent implements OnInit, OnDestroy {
         'line-width': 2
       }
     });
-
-
   }
+
+  //#endregion
+
+   // Listen for window resize events to adjust map height
+   @HostListener('window:resize', ['$event'])
+   onResize(event: Event) {
+     this.setMapHeight();
+   }
 
   setMapHeight(): void {
     // const navbarHeight = document.querySelector('.navbar')?.clientHeight || 0; // Get navbar height
@@ -144,17 +222,6 @@ export class MapComponent implements OnInit, OnDestroy {
 
     //   mapContainer.style.height = `${window.innerHeight - navbarHeight}px`; // Set map height
     // }
-  }
-
-  mapEvents(): void {
-    this.map.on('zoomend', () => {
-      const zoomLevel = this.map.getZoom();
-      localStorage.setItem('mapZoom', zoomLevel.toString());
-    });
-    this.map.on('moveend', () => {
-      const center = this.map.getCenter();
-      localStorage.setItem('mapCenter', JSON.stringify([center.lng, center.lat]));
-    });
   }
 
   ngOnDestroy(): void {
