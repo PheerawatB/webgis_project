@@ -71,33 +71,33 @@ export class MapComponent implements OnInit, OnDestroy {
 
       this.map.on('load', () => {
         this.map.addSource('floorplan', {
-            // GeoJSON Data source used in vector tiles, documented at
-            // https://gist.github.com/ryanbaumann/a7d970386ce59d11c16278b90dde094d
-            'type': 'geojson',
-            'data': 'https://maplibre.org/maplibre-gl-js/docs/assets/indoor-3d-map.geojson'
+          // GeoJSON Data source used in vector tiles, documented at
+          // https://gist.github.com/ryanbaumann/a7d970386ce59d11c16278b90dde094d
+          'type': 'geojson',
+          'data': 'https://maplibre.org/maplibre-gl-js/docs/assets/indoor-3d-map.geojson'
         });
         this.map.addLayer({
-            'id': 'room-extrusion',
-            'type': 'fill-extrusion',
-            'source': 'floorplan',
-            'paint': {
-                // See the MapLibre Style Specification for details on data expressions.
-                // https://maplibre.org/maplibre-style-spec/expressions/
+          'id': 'room-extrusion',
+          'type': 'fill-extrusion',
+          'source': 'floorplan',
+          'paint': {
+            // See the MapLibre Style Specification for details on data expressions.
+            // https://maplibre.org/maplibre-style-spec/expressions/
 
-                // Get the fill-extrusion-color from the source 'color' property.
-                'fill-extrusion-color': ['get', 'color'],
+            // Get the fill-extrusion-color from the source 'color' property.
+            'fill-extrusion-color': ['get', 'color'],
 
-                // Get fill-extrusion-height from the source 'height' property.
-                'fill-extrusion-height': ['get', 'height'],
+            // Get fill-extrusion-height from the source 'height' property.
+            'fill-extrusion-height': ['get', 'height'],
 
-                // Get fill-extrusion-base from the source 'base_height' property.
-                'fill-extrusion-base': ['get', 'base_height'],
+            // Get fill-extrusion-base from the source 'base_height' property.
+            'fill-extrusion-base': ['get', 'base_height'],
 
-                // Make extrusions slightly opaque for see through indoor walls.
-                'fill-extrusion-opacity': 0.5
-            }
+            // Make extrusions slightly opaque for see through indoor walls.
+            'fill-extrusion-opacity': 0.5
+          }
         });
-    });
+      });
     }
 
     this.initialMapController();
@@ -155,10 +155,10 @@ export class MapComponent implements OnInit, OnDestroy {
     });
 
     // Retrieve the BBOX of the added raster layer
-    this.getRasterLayerBbox(rasterSourceId,name);
+    this.getRasterLayerBbox(rasterSourceId, name);
   }
 
-  getRasterLayerBbox(sourceId: string,name :string): void {
+  getRasterLayerBbox(sourceId: string, name: string): void {
     const source = this.map.getSource(sourceId);
     let bbox = ''
     if (source) {
@@ -189,31 +189,75 @@ export class MapComponent implements OnInit, OnDestroy {
 
   setRoadOnMap(bbox: string) {
     const data = `http://138.197.163.159:8080/geoserver/gis/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=gis:thailand_road&BBOX=${bbox}&outputFormat=application/json`
+    fetch(data)
+      .then(response => response.json())
+      .then(data => {
+        // Decode the road names
+        data.features.forEach((feature: any) => {
+          if (feature.properties.name) {
+            feature.properties.name = decodeUtf8Text(feature.properties.name); // Decode the name
+          }
+        });
+        
+        // Add the decoded data as a source to the map
+        this.map.addSource('thailand-roads', {
+          type: 'geojson',
+          data: data
+        });
 
-    this.map.addSource('thailand-roads', {
-      type: 'geojson',
-      data: data
-    });
+        // Add the layer to display the roads
+        this.map.addLayer({
+          id: 'roads-layer',
+          type: 'line',
+          source: 'thailand-roads',
+          paint: {
+            'line-color': 'rgba(255, 255, 255, 0.7)',
+            'line-width': 2
+          }
+        });
+        
 
-    // Add a layer to display the railways
-    this.map.addLayer({
-      id: 'roads-layer',
-      type: 'line',
-      source: 'thailand-roads', // Ensure this source is defined
-      paint: {
-        'line-color': 'rgba(255, 255, 255, 0.7)', // White color with 50% opacity
-        'line-width': 2
+        // Add a layer to display the road names
+        this.map.addLayer({
+          id: 'roads-name-layer',
+          type: 'symbol',
+          source: 'thailand-roads',
+          layout: {
+            'text-field': ['get', 'name'], // Use the decoded name field
+            // 'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+            'text-size': 12,
+            'symbol-placement': 'line',
+            'text-anchor': 'center'
+          },
+          paint: {
+            'text-color': '#000',
+            'text-halo-color': '#fff',
+            'text-halo-width': 2
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error fetching or processing the data:', error);
+      });
+
+    // Function to decode UTF-8 text
+    function decodeUtf8Text(text: string): string {
+      try {
+        return decodeURIComponent(escape(text));
+      } catch (e) {
+        console.error('Error decoding text:', e);
+        return text; // Fallback to the original if decoding fails
       }
-    });
+    }
   }
 
   //#endregion
 
-   // Listen for window resize events to adjust map height
-   @HostListener('window:resize', ['$event'])
-   onResize(event: Event) {
-     this.setMapHeight();
-   }
+  // Listen for window resize events to adjust map height
+  @HostListener('window:resize', ['$event'])
+  onResize(event: Event) {
+    this.setMapHeight();
+  }
 
   setMapHeight(): void {
     // const navbarHeight = document.querySelector('.navbar')?.clientHeight || 0; // Get navbar height

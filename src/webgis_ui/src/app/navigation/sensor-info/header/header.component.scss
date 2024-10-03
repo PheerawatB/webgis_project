@@ -1,0 +1,67 @@
+.sensor-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.5em;
+    font-weight: bold;
+  }
+  
+  // .event-info, .device-status, .image-gallery, .trigger-summary {
+  //   margin-top: 10px;
+  //   // margin-bottom: 0px;
+  // }
+  
+  .event-counters span {
+    display: inline-block;
+    margin-right: 10px;
+  }
+  
+  .device-status strong{
+    font-size: 0.9em;
+    color: #4caf50;
+  }
+  
+
+  .sensor-container {
+    background-color: #1e2a34;
+    padding: 10px 30px;
+    // border-radius: 10px;
+    color: white;
+    // width: 300px;
+    // height: 100%;
+    overflow-y: scroll;
+  }
+  
+  span {
+    color: #ccc;
+    font-size: 0.85em;
+  }
+  .trigger-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .trigger-summary a {
+    color: #4caf50;
+    text-decoration: none;
+    font-size: 0.9em;
+  }
+  
+  .cam-button {
+    background-color: #4b848e; /* Button background color */
+    color: #ffffff; /* Text color */
+    border: none; /* Remove default border */
+    /* border-radius: 5px; Rounded corners */
+    // padding: 5px 10px; /* Padding for the button */
+    font-size: 14px; /* Font size */
+    cursor: pointer; /* Cursor style on hover */
+    display: inline-block; /* Inline-block display */
+  }
+  
+  .sensor-title {
+    margin: 0;
+    color: white;
+    padding-bottom: 5px;
+    padding-top: 5px;
+  }
+  
