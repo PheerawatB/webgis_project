@@ -188,7 +188,8 @@ export class MapComponent implements OnInit, OnDestroy {
   }
 
   setRoadOnMap(bbox: string) {
-    const data = `http://138.197.163.159:8080/geoserver/gis/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=gis:thailand_road&BBOX=${bbox}&outputFormat=application/json`
+    const data = `http://138.197.163.159:8080/geoserver/gis/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=gis:thailand_road&BBOX=${bbox}&outputFormat=application/json`;
+
     fetch(data)
       .then(response => response.json())
       .then(data => {
@@ -198,24 +199,49 @@ export class MapComponent implements OnInit, OnDestroy {
             feature.properties.name = decodeUtf8Text(feature.properties.name); // Decode the name
           }
         });
-        
+
         // Add the decoded data as a source to the map
         this.map.addSource('thailand-roads', {
           type: 'geojson',
           data: data
         });
 
-        // Add the layer to display the roads
+        // Layer for road styles
         this.map.addLayer({
           id: 'roads-layer',
           type: 'line',
           source: 'thailand-roads',
           paint: {
-            'line-color': 'rgba(255, 255, 255, 0.7)',
-            'line-width': 2
+            'line-color': [
+              'case',
+              // Primary and motorway classes
+              ['in', ['get', 'fclass'], 'primary'], 'rgba(252, 252, 255, 0.6)', // Vibrant color for primary
+              ['in', ['get', 'fclass'], 'primary_link'], 'rgba(252, 252, 255, 0.6)', // Vibrant color for primary_link
+              ['in', ['get', 'fclass'], 'motorway'], 'rgba(252, 252, 255, 0.6)', // Vibrant color for motorway
+              ['in', ['get', 'fclass'], 'motorway_link'], 'rgba(252, 252, 255, 0.6)', // Vibrant color for motorway_link
+              ['in', ['get', 'fclass'], 'secondary'], 'rgba(252, 252, 255, 0.6)', // Less vibrant for secondary roads
+              ['in', ['get', 'fclass'], 'tertiary'], 'rgba(252, 252, 255, 0.6)', // Softer for tertiary roads
+              ['in', ['get', 'fclass'], 'residential'], 'rgba(252, 252, 255, 0.6)', // Softest for residential roads
+
+              // Fallback for any other roads
+              'rgba(252, 252, 252, 1)'
+            ],
+            'line-width': [
+              'case',
+              // Wide for primary/motorway roads
+              ['in', ['get', 'fclass'], 'primary'], 6, // Vibrant color for primary
+              ['in', ['get', 'fclass'], 'primary_link'], 6, // Vibrant color for primary_link
+              ['in', ['get', 'fclass'], 'motorway'], 8, // Vibrant color for motorway
+              ['in', ['get', 'fclass'], 'motorway_link'], 6,
+              ['in', ['get', 'fclass'], 'secondary'], 4,
+              ['in', ['get', 'fclass'], 'tertiary'], 4,
+              ['in', ['get', 'fclass'], 'residential'], 4,
+              // Fallback default width for any other roads
+              4
+            ]
+
           }
         });
-        
 
         // Add a layer to display the road names
         this.map.addLayer({
@@ -224,7 +250,6 @@ export class MapComponent implements OnInit, OnDestroy {
           source: 'thailand-roads',
           layout: {
             'text-field': ['get', 'name'], // Use the decoded name field
-            // 'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
             'text-size': 12,
             'symbol-placement': 'line',
             'text-anchor': 'center'
@@ -250,6 +275,7 @@ export class MapComponent implements OnInit, OnDestroy {
       }
     }
   }
+
 
   //#endregion
 
